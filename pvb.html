@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Super Tic Tac Toe vs Bot</title>
+  <style>
+    :root {
+      --x-color: #4caf50;
+      --o-color: #f44336;
+      --board-bg: #fff;
+      --cell-bg: #e0e0e0;
+      --text-color: #000;
+      --background: #fafafa;
+      --overlay-bg: rgba(255, 255, 255, 0.85);
+    }
+
+    body.dark {
+      --board-bg: #222;
+      --cell-bg: #444;
+      --text-color: #fff;
+      --background: #121212;
+      --overlay-bg: rgba(0, 0, 0, 0.6);
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--background);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: var(--text-color);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .mini-board {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      background: var(--board-bg);
+      border: 3px solid #333;
+      aspect-ratio: 1;
+      width: 28vw;
+      max-width: 180px;
+      min-width: 100px;
+      border-radius: 10px;
+      overflow: hidden;
+      transition: 0.3s;
+    }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: var(--cell-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      user-select: none;
+      border-radius: 3px;
+    }
+
+    .cell.X {
+      color: var(--x-color);
+    }
+
+    .cell.O {
+      color: var(--o-color);
+    }
+
+    .cell:hover {
+      background: #d5d5d5;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      font-size: 6em;
+      font-weight: bold;
+      background: var(--overlay-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 2;
+      color: var(--x-color);
+    }
+
+    .overlay.O {
+      color: var(--o-color);
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #1976d2;
+    }
+
+    .mode-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-direction: row;
+    }
+
+    .mode-buttons button {
+      background: transparent;
+      color: var(--text-color);
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      margin-top: 0;
+    }
+
+    #rules {
+      margin-top: 15px;
+      font-size: 0.95em;
+      max-width: 600px;
+      text-align: center;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .mini-board {
+        width: 28vw;
+        min-width: 80px;
+      }
+
+      .cell {
+        font-size: 1.4em;
+      }
+
+      .overlay {
+        font-size: 4em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Super Tic Tac Toe vs Bot</h1>
+  <div class="board" id="main-board"></div>
+  <div id="status">Player X's turn</div>
+
+  <button onclick="resetGame()">Restart</button>
+
+  <div class="mode-buttons">
+    <button onclick="setLightMode()">☀️</button>
+    <button onclick="setDarkMode()">🌙</button>
+  </div>
+
+  <button onclick="toggleRules()">Rules</button>
+
+  <div id="rules">
+    <p>
+      <strong>Super Tic Tac Toe Rules:</strong><br />
+      The board is made up of 9 small Tic Tac Toe boards. Players take turns placing their symbol (X or O).<br/>
+      The small board where the next move must be played depends on the cell the opponent chose last.<br/>
+      If a player wins a small board, they own that section of the large board.<br/>
+      To win the game, win 3 small boards in a row (horizontally, vertically, or diagonally).<br/>
+      If the target board is full or already won, the next player can choose any board.
+    </p>
+  </div>
+
+  <script>
+    const mainBoard = document.getElementById("main-board");
+    const statusDiv = document.getElementById("status");
+    const rulesDiv = document.getElementById("rules");
+
+    let currentPlayer = "X";
+    let nextBoard = -1;
+    let miniBoards = [];
+    let bigBoard = Array(9).fill("");
+
+    function createBoard() {
+      mainBoard.innerHTML = "";
+      miniBoards = [];
+      bigBoard = Array(9).fill("");
+      currentPlayer = "X";
+      nextBoard = -1;
+      statusDiv.textContent = "Player X's turn";
+
+      for (let i = 0; i < 9; i++) {
+        const mini = document.createElement("div");
+        mini.className = "mini-board";
+        mini.dataset.index = i;
+
+        const cells = [];
+
+        for (let j = 0; j < 9; j++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.index = j;
+          cell.addEventListener("click", () => handleClick(i, j));
+          mini.appendChild(cell);
+          cells.push(cell);
+        }
+
+        mainBoard.appendChild(mini);
+        miniBoards.push({ element: mini, cells, winner: "" });
+      }
+    }
+
+    function handleClick(boardIndex, cellIndex) {
+      if (currentPlayer !== "X") return;
+
+      const mini = miniBoards[boardIndex];
+      if (mini.winner || mini.cells[cellIndex].textContent !== "" || (nextBoard !== -1 && nextBoard !== boardIndex)) {
+        return;
+      }
+
+      makeMove(boardIndex, cellIndex, "X");
+
+      if (checkWinner(bigBoard)) return;
+
+      setTimeout(botMove, 400);
+    }
+
+    function makeMove(boardIndex, cellIndex, player) {
+      const mini = miniBoards[boardIndex];
+      const cell = mini.cells[cellIndex];
+      cell.textContent = player;
+      cell.classList.add(player);
+
+      if (checkWinner(mini.cells.map(c => c.textContent))) {
+        mini.winner = player;
+        bigBoard[boardIndex] = player;
+        showOverlay(mini.element, player);
+        if (checkWinner(bigBoard)) {
+          statusDiv.textContent = `🎉 Player ${player} wins the game!`;
+          disableAll();
+          return;
+        }
+      }
+
+      nextBoard = miniBoards[cellIndex]?.winner || isFull(miniBoards[cellIndex]?.cells) ? -1 : cellIndex;
+      currentPlayer = player === "X" ? "O" : "X";
+      statusDiv.textContent = `Player ${currentPlayer}'s turn` + (nextBoard === -1 ? " (any board)" : ` (board ${nextBoard + 1})`);
+    }
+
+    function botMove() {
+      if (currentPlayer !== "O") return;
+
+      const boardsToCheck = nextBoard === -1 ? [...Array(9).keys()] : [nextBoard];
+
+      for (const b of boardsToCheck) {
+        const mini = miniBoards[b];
+        if (mini.winner || isFull(mini.cells)) continue;
+
+        // Try to win
+        for (let i = 0; i < 9; i++) {
+          if (mini.cells[i].textContent === "") {
+            mini.cells[i].textContent = "O";
+            if (checkWinner(mini.cells.map(c => c.textContent))) {
+              mini.cells[i].textContent = "";
+              makeMove(b, i, "O");
+              return;
+            }
+            mini.cells[i].textContent = "";
+          }
+        }
+
+        // Try to block
+        for (let i = 0; i < 9; i++) {
+          if (mini.cells[i].textContent === "") {
+            mini.cells[i].textContent = "X";
+            if (checkWinner(mini.cells.map(c => c.textContent))) {
+              mini.cells[i].textContent = "";
+              makeMove(b, i, "O");
+              return;
+            }
+            mini.cells[i].textContent = "";
+          }
+        }
+
+        // Pick random empty
+        const empty = mini.cells.map((c, i) => c.textContent === "" ? i : -1).filter(i => i !== -1);
+        if (empty.length > 0) {
+          const move = empty[Math.floor(Math.random() * empty.length)];
+          makeMove(b, move, "O");
+          return;
+        }
+      }
+    }
+
+    function showOverlay(miniElement, winner) {
+      const overlay = document.createElement("div");
+      overlay.className = "overlay " + winner;
+      overlay.textContent = winner;
+      miniElement.appendChild(overlay);
+    }
+
+    function checkWinner(board) {
+      const wins = [
+        [0,1,2], [3,4,5], [6,7,8],
+        [0,3,6], [1,4,7], [2,5,8],
+        [0,4,8], [2,4,6]
+      ];
+      return wins.some(([a,b,c]) => board[a] && board[a] === board[b] && board[a] === board[c]);
+    }
+
+    function isFull(cells) {
+      return cells.every(cell => cell.textContent !== "");
+    }
+
+    function disableAll() {
+      miniBoards.forEach(mini => mini.cells.forEach(cell => cell.style.pointerEvents = "none"));
+    }
+
+    function resetGame() {
+      createBoard();
+    }
+
+    function setDarkMode() {
+      document.body.classList.add("dark");
+    }
+
+    function setLightMode() {
+      document.body.classList.remove("dark");
+    }
+
+    function toggleRules() {
+      rulesDiv.style.display = rulesDiv.style.display === "none" ? "block" : "none";
+    }
+
+    createBoard();
+  </script>
+</body>
+</html>
